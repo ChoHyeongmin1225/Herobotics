@@ -18,6 +18,12 @@ def main():
         brain = LLMEngine()
         print("✅ 성공")
         
+        print("\n⚠️  [주의] 로봇이 초기 자세(Neutral)로 움직입니다.")
+        print("   - 주변에 물건을 치우고 손을 멀리하세요.")
+        input("   - 준비되었으면 [Enter] 키를 누르세요 >> ")
+        
+        driver.go_to_neutral()
+        
     except Exception as e:
         print(f"\n🔥 초기화 실패: {e}")
         return

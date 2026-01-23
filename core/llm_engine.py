@@ -1,5 +1,6 @@
 import os
 import json
+import time
 import google.generativeai as genai
 from dotenv import load_dotenv
 
@@ -41,17 +42,41 @@ class LLMEngine:
         
         # 3. 모델 초기화 (JSON 모드)
         self.model = genai.GenerativeModel(
-            model_name="gemini-2.0-flash-exp",
+            model_name="gemini-2.5-flash",
             generation_config={"response_mime_type": "application/json"},
             system_instruction=self.system_instruction
         )
         self.chat = self.model.start_chat(history=[])
 
     def generate_response(self, user_input):
-        print("🧠 [Brain] 생각 중...")
-        try:
-            response = self.chat.send_message(user_input)
-            return json.loads(response.text)
-        except Exception as e:
-            print(f"❌ [Brain] 생각 오류: {e}")
-            return None
+        print("🧠 [Brain] 생각 중...", end="", flush=True)
+        
+        max_retries = 3      # 최대 3번까지 재시도
+        retry_delay = 30     # 30초 대기 (구글 제한 풀리는 시간)
+
+        for attempt in range(max_retries):
+            try:
+                # API 호출
+                response = self.chat.send_message(user_input)
+                print(" ✅ 완료")
+                return json.loads(response.text)
+
+            except Exception as e:
+                error_msg = str(e)
+                # 429 에러(Quota Exceeded)가 발생했는지 확인
+                if "429" in error_msg or "Quota exceeded" in error_msg:
+                    print(f"\n⏳ [System] API 호출 한도 초과! ({attempt+1}/{max_retries})")
+                    print(f"   - 구글 무료 정책(1분 5회) 때문에 {retry_delay}초간 열을 식힙니다...")
+                    
+                    # 카운트다운 보여주기 (지루하지 않게)
+                    for i in range(retry_delay, 0, -1):
+                        print(f"   ... {i}초 남음", end='\r')
+                        time.sleep(1)
+                    print("   ▶️ 다시 시도합니다!                    ")
+                else:
+                    # 다른 에러면 그냥 실패 처리
+                    print(f"\n❌ [Brain] 생각 오류: {e}")
+                    return None
+        
+        print("❌ [System] 여러 번 시도했으나 실패했습니다.")
+        return None
