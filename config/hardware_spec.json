@@ -1,0 +1,147 @@
+{
+  "robot_info": {
+    "name": "Herobot",
+    "version": "1.0",
+    "description": "17 DoF Upper-body Humanoid Research Platform",
+    "default_baudrate": 57600,
+    "port": "COM6"
+  },
+  "motors": [
+    {
+      "id": 1,
+      "name": "head_tilt_up",
+      "neutral": 1026,
+      "min": 600,
+      "max": 1026,
+      "desc": "목을 위로 든다. [주의] 값이 줄어들수록 위로 들리고, 초기값(1026)보다 커지면 안 된다."
+    },
+    {
+      "id": 2,
+      "name": "head_pan",
+      "neutral": 2032,
+      "min": 1500,
+      "max": 2500,
+      "desc": "고개를 좌우로 돌린다. 값 증가(+): 왼쪽, 값 감소(-): 오른쪽"
+    },
+    {
+      "id": 3,
+      "name": "head_tilt_down",
+      "neutral": 1027,
+      "min": 600,
+      "max": 1027,
+      "desc": "목을 아래로 숙인다. 값이 줄어들수록 아래로 내려간다."
+    },
+    {
+      "id": 4,
+      "name": "r_shoulder_pitch",
+      "neutral": 1071,
+      "min": 500,
+      "max": 3500,
+      "desc": "오른팔 전체를 앞뒤로 든다. 값 증가(+): 앞(위), 값 감소(-): 뒤"
+    },
+    {
+      "id": 5,
+      "name": "l_shoulder_pitch",
+      "neutral": 2065,
+      "min": 500,
+      "max": 3500,
+      "desc": "왼팔 전체를 앞뒤로 든다. 값 감소(-): 앞(위), 값 증가(+): 뒤"
+    },
+    {
+      "id": 6,
+      "name": "waist_yaw",
+      "neutral": 3122,
+      "min": 2600,
+      "max": 3600,
+      "desc": "허리를 좌우로 회전한다. 값 증가(+): 왼쪽, 값 감소(-): 오른쪽"
+    },
+    {
+      "id": 7,
+      "name": "waist_pitch",
+      "neutral": 2055,
+      "min": 1500,
+      "max": 2250,
+      "desc": "허리를 숙인다. 값 감소(-): 앞으로 인사, 값 증가(+): 뒤로 젖힘 (최대 2250 제한)"
+    },
+    {
+      "id": 8,
+      "name": "r_shoulder_roll",
+      "neutral": 1868,
+      "min": 1500,
+      "max": 2500,
+      "desc": "오른팔을 옆으로 벌린다(사이드). 값 증가(+): 벌림(Up), 값 감소(-): 붙임(Down)"
+    },
+    {
+      "id": 9,
+      "name": "r_arm_yaw",
+      "neutral": 1002,
+      "min": 500,
+      "max": 1500,
+      "desc": "오른팔 상박을 회전한다. 값 감소(-): 왼쪽 회전, 값 증가(+): 오른쪽 회전"
+    },
+    {
+      "id": 10,
+      "name": "r_elbow_upper",
+      "neutral": 2060,
+      "min": 1500,
+      "max": 2600,
+      "desc": "오른쪽 팔꿈치 상단 관절. 값 감소(-): 앞으로 굽힘, 값 증가(+): 뒤로 폄"
+    },
+    {
+      "id": 11,
+      "name": "r_elbow_lower",
+      "neutral": 2058,
+      "min": 1500,
+      "max": 2600,
+      "desc": "오른쪽 팔꿈치 하단 관절. 값 감소(-): 앞으로 굽힘, 값 증가(+): 뒤로 폄 (ID 10과 함께 사용 권장)"
+    },
+    {
+      "id": 12,
+      "name": "r_wrist_roll",
+      "neutral": 2048,
+      "min": 1500,
+      "max": 2500,
+      "desc": "오른쪽 손목을 꺾는다. 값 감소(-): 오른쪽, 값 증가(+): 왼쪽"
+    },
+    {
+      "id": 13,
+      "name": "l_shoulder_roll",
+      "neutral": 2894,
+      "min": 2400,
+      "max": 3400,
+      "desc": "왼팔을 옆으로 벌린다(사이드). 값 증가(+): 벌림(Up), 값 감소(-): 붙임(Down)"
+    },
+    {
+      "id": 14,
+      "name": "l_arm_yaw",
+      "neutral": 1094,
+      "min": 600,
+      "max": 1600,
+      "desc": "왼팔 상박을 회전한다. 값 감소(-): 왼쪽 회전, 값 증가(+): 오른쪽 회전"
+    },
+    {
+      "id": 15,
+      "name": "l_elbow_upper",
+      "neutral": 2075,
+      "min": 1500,
+      "max": 2600,
+      "desc": "왼쪽 팔꿈치 상단 관절. 값 증가(+): 앞으로 굽힘, 값 감소(-): 뒤로 폄"
+    },
+    {
+      "id": 16,
+      "name": "l_elbow_lower",
+      "neutral": 2036,
+      "min": 1500,
+      "max": 2600,
+      "desc": "왼쪽 팔꿈치 하단 관절. 값 증가(+): 앞으로 굽힘, 값 감소(-): 뒤로 폄 (ID 15와 함께 사용 권장)"
+    },
+    {
+      "id": 17,
+      "name": "l_wrist_roll",
+      "neutral": 2022,
+      "min": 1500,
+      "max": 2500,
+      "desc": "왼쪽 손목을 꺾는다. 값 감소(-): 왼쪽, 값 증가(+): 오른쪽"
+    }
+  ]
+}
