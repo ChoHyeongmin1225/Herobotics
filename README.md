@@ -40,19 +40,21 @@ Herobot은 LLM의 환각(Hallucination)을 방지하고 물리적 안전성을 �
 
 ---
 
-## ⚙️ Hardware Specifications (Conceptual)
+## ⚙️ Hardware Specifications
 
-Herobot은 상호작용에 최적화된 **Tabletop Humanoid** 형태입니다. (설계 중)
+Herobot은 상호작용 연구를 위해 정밀하게 설계된 **17-DoF High-End Tabletop Humanoid**입니다.
 
-| Part | DoF | Description | Features |
+| Part | Motors | Structure (IDs) | Description & Features |
 | :--- | :---: | :--- | :--- |
-| **Head** | 2 | Pan, Tilt | 시선 맞춤(Eye-contact), 끄덕임 |
-| **Waist** | 1~2 | Pitch, (Roll) | **감정 표현의 핵심.** 인사의 깊이, 태도(Attitude) 표현 |
-| **Arms** | 6 | Shoulder(2), Elbow(1) x 2 | 제스처, 가리키기(Deictic), 자기 신체 접촉 |
-| **Total** | **~10** | **High-DoF Upper Body** | 인간과 유사한 상체 표현력 확보 |
+| **Head** | 3 | Pan(2), Tilt-Up(1), Tilt-Down(3) | **Split-Pitch Mechanism.** 상(Up)/하(Down) 움직임 모터가 분리되어 있어, 인간의 미세한 턱 끝 움직임과 시선 처리를 정교하게 모방함. |
+| **Waist** | 2 | Yaw(6), Pitch(7) | **Core Expression.** 인사(Pitch)와 거절/회피(Yaw) 등 로봇의 태도(Attitude)를 결정짓는 핵심 부위. |
+| **R-Arm** | 6 | Shd(4,8), Arm(9), Elb(10+11), Wri(12) | **Dual-Motor Elbow.** 팔꿈치 관절 하나에 2개의 모터(10, 11)를 동기화하여 사용하여 토크를 강화하고 떨림을 방지함. |
+| **L-Arm** | 6 | Shd(5,13), Arm(14), Elb(15+16), Wri(17) | **Symmetric Design.** 오른팔과 완벽한 대칭 구조. 복잡한 핸드 제스처 및 자기 신체 접촉(Self-touch) 가능. |
+| **Total** | **17** | **Full Upper Body** | **Physical AI Optimized.** LLM이 생성한 복합적인 감정 표현을 물리적으로 구현하기 위한 고자유도 설계. |
 
-* **Actuators:** ROBOTIS Dynamixel (2XL430-W250-T Series)
-* **Controller:** U2D2
+* **Actuators:** ROBOTIS Dynamixel **2XL430-W250-T** Series (Dual Axis Module)
+* **Controller:** ROBOTIS **U2D2** (USB Interface)
+* **Communication:** Protocol 2.0 (57600 bps)
 
 ---
 
