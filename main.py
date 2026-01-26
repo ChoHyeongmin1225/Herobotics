@@ -41,11 +41,10 @@ def main():
                 break
             
             # (2) 생각하기
-            # (참고: LLM은 내부적으로는 'text'를 생성하지만, 여기선 출력하지 않고 무시합니다)
             action_plan = brain.generate_response(user_input)
             
             if action_plan:
-                # (3) 움직이기 (말 없이 행동만 수행)
+                # (3) 움직이기
                 motions = action_plan.get('motions', [])
                 
                 if motions:
@@ -53,28 +52,40 @@ def main():
                     
                     for i, motion in enumerate(motions):
                         joint = motion.get('joint')
-                        pos = motion.get('pos')
                         
-                        if joint and pos:
-                            # 디버깅을 위해 어떤 모터가 움직이는지만 표시
-                            print(f"   └─ [{i+1}] {joint} -> {pos}")
-                            driver.move_joint(joint, int(pos))
+                        # ★ [수정 1] 관절은 'pos', 바퀴는 'val' 값을 가져오도록 처리
+                        target_value = motion.get('pos')
+                        if target_value is None:
+                            target_value = motion.get('val')
+                        
+                        if joint and target_value is not None:
+                            print(f"   └─ [{i+1}] {joint} -> {target_value}")
+                            driver.move_joint(joint, int(target_value))
                             
-                            # 동작 사이 간격 (필요에 따라 조절)
-                            time.sleep(0.05)
+                            # ★ [수정 2] 바퀴가 연속으로 올 때는 딜레이를 줄여서(거의 0) 동시성 확보
+                            if "wheel" in joint:
+                                time.sleep(0.005) # 5ms (거의 동시에 실행)
+                            else:
+                                time.sleep(0.05)  # 관절은 기존대로 50ms
                     
                     # 동작 완료 후 안정화 대기
                     time.sleep(0.5)
                     print("   └─ (완료)")
                 else:
                     print("⚡ [Idle] 움직임 없음 (판단: 가만히 있기로 결정)")
+                    # 대화 내용(text)이 있으면 출력해주는 것이 좋음
+                    if "text" in action_plan:
+                        print(f"   🗣️  [Say]: {action_plan['text']}")
             else:
                 print("⚠️ [Error] 행동 생성 실패")
 
         except KeyboardInterrupt:
+            print("\n🛑 사용자 중단 요청")
             break
         except Exception as e:
             print(f"❌ 오류: {e}")
+            # 에러 상세 내용을 보기 위해 주석 해제 가능
+            # import traceback; traceback.print_exc()
 
     driver.close()
 
