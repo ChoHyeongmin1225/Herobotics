@@ -5,7 +5,7 @@ from core.llm_engine import LLMEngine
 
 def main():
     print("=============================================")
-    print("🤖 Herobot Silent Mode (Motion Only)")
+    print("🤖 Herobot Silent Mode (With Delay Support)")
     print("=============================================")
     
     # 1. 모듈 초기화
@@ -51,41 +51,52 @@ def main():
                     print(f"⚡ [Action] {len(motions)}개의 동작 실행 중...")
                     
                     for i, motion in enumerate(motions):
+                        # 1. Delay 처리
+                        if 'delay' in motion:
+                            delay_time = float(motion['delay'])
+                            print(f"   ⏳ [Wait] {delay_time}초 대기...")
+                            time.sleep(delay_time)
+                            continue
+
+                        # 2. Joint & Value 파싱
                         joint = motion.get('joint')
+                        target_value = motion.get('pos') if motion.get('pos') is not None else motion.get('val')
                         
-                        # ★ [수정 1] 관절은 'pos', 바퀴는 'val' 값을 가져오도록 처리
-                        target_value = motion.get('pos')
-                        if target_value is None:
-                            target_value = motion.get('val')
+                        # ★ [추가] 속도(Speed) 파싱
+                        # JSON에 "speed"가 있으면 가져오고, 없으면 None (기본값)
+                        target_speed = motion.get('speed') 
                         
                         if joint and target_value is not None:
-                            print(f"   └─ [{i+1}] {joint} -> {target_value}")
-                            driver.move_joint(joint, int(target_value))
+                            # 로그에 속도 정보도 표시
+                            speed_log = f" (속도: {target_speed})" if target_speed else ""
+                            print(f"   └─ [{i+1}] {joint} -> {target_value}{speed_log}")
                             
-                            # ★ [수정 2] 바퀴가 연속으로 올 때는 딜레이를 줄여서(거의 0) 동시성 확보
+                            # 드라이버에 속도 전달
+                            driver.move_joint(joint, int(target_value), velocity=target_speed)
+                            
                             if "wheel" in joint:
-                                time.sleep(0.005) # 5ms (거의 동시에 실행)
+                                time.sleep(0.005)
                             else:
-                                time.sleep(0.05)  # 관절은 기존대로 50ms
+                                time.sleep(0.05)
                     
-                    # 동작 완료 후 안정화 대기
-                    time.sleep(0.5)
-                    print("   └─ (완료)")
+                    print("   └─ (모든 시퀀스 완료)")
+                    
+                    if "text" in action_plan:
+                        print(f"   🗣️  [Say]: {action_plan['text']}")
                 else:
-                    print("⚡ [Idle] 움직임 없음 (판단: 가만히 있기로 결정)")
-                    # 대화 내용(text)이 있으면 출력해주는 것이 좋음
+                    print("⚡ [Idle] 움직임 없음")
                     if "text" in action_plan:
                         print(f"   🗣️  [Say]: {action_plan['text']}")
             else:
                 print("⚠️ [Error] 행동 생성 실패")
 
         except KeyboardInterrupt:
-            print("\n🛑 사용자 중단 요청")
+            print("\n🚨 [EMERGENCY] 비상 정지 발동!")
+            driver.move_joint("wheel_left", 0)
+            driver.move_joint("wheel_right", 0)
             break
         except Exception as e:
             print(f"❌ 오류: {e}")
-            # 에러 상세 내용을 보기 위해 주석 해제 가능
-            # import traceback; traceback.print_exc()
 
     driver.close()
 

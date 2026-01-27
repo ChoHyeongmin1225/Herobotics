@@ -4,28 +4,31 @@ from dynamixel_sdk import *
 
 class DxlDriver:
     def __init__(self, spec_path="config/hardware_spec.json"):
-        # 1. 스펙 파일 로드
+        # 1. 스펙 로드
         with open(spec_path, 'r', encoding='utf-8') as f:
             self.spec = json.load(f)
         
         self.port_name = self.spec['robot_info']['port']
         self.baudrate = self.spec['robot_info']['default_baudrate']
-        # 빠른 조회를 위해 dict로 변환
         self.motors = {m['name']: m for m in self.spec['motors']}
         
-        # 2. 다이나믹셀 통신 핸들러
+        # 2. 통신 핸들러
         self.portHandler = PortHandler(self.port_name)
         self.packetHandler = PacketHandler(2.0)
+
+        # ★ [추가] SyncWrite 핸들러 (동시 제어용)
+        # 주소 116(Goal Position)에 4바이트씩 씀
+        self.ADDR_GOAL_POSITION = 116
+        self.ADDR_GOAL_VELOCITY = 104
+        self.groupSyncWritePos = GroupSyncWrite(self.portHandler, self.packetHandler, self.ADDR_GOAL_POSITION, 4)
         
-        # 3. 제어 테이블 주소 (X-Series 공통)
-        self.ADDR_OPERATING_MODE = 11        # ★ 운영 모드 (1:속도, 3:위치)
+        # 주소 정의
+        self.ADDR_OPERATING_MODE = 11
         self.ADDR_TORQUE_ENABLE = 64
-        self.ADDR_GOAL_VELOCITY = 104        # ★ 속도 제어용 목표값
         self.ADDR_PROFILE_ACCELERATION = 108
-        self.ADDR_PROFILE_VELOCITY = 112     # 위치 제어용 프로파일 속도
-        self.ADDR_GOAL_POSITION = 116        # 위치 제어용 목표값
-        
-        # 4. 연결 시작
+        self.ADDR_PROFILE_VELOCITY = 112
+
+        # 3. 연결
         if not self.portHandler.openPort():
             raise Exception(f"❌ 포트 열기 실패: {self.port_name}")
         if not self.portHandler.setBaudRate(self.baudrate):
@@ -33,66 +36,58 @@ class DxlDriver:
             
         print(f"✅ [Driver] 하드웨어 연결 성공 ({self.port_name})")
         
-        # 5. 모터 모드 설정 및 초기화
-        # 주의: 운영 모드를 바꾸려면 토크가 꺼져 있어야 함
+        # 4. 초기화
         self.enable_torque(False) 
-        self.setup_operating_modes() # ★ 바퀴/관절 모드 구분 설정
+        self.setup_operating_modes()
         self.enable_torque(True)
         
-        # 6. 모션 프로파일(부드러움) 적용
-        self.set_smooth_motion_profile()
+        # ★ 초기에는 '아주 느린 모드'로 설정 (안전 복귀용)
+        self.set_motion_profile(velocity=50, accel=10) 
 
     def setup_operating_modes(self):
-        """JSON의 'type'에 따라 운영 모드를 설정합니다."""
-        print("⚡ [System] 모터 운영 모드 설정 중...")
+        """운영 모드 설정 (Wheel:1, Joint:3)"""
         for name, info in self.motors.items():
             motor_id = info['id']
-            # type이 'wheel'이면 속도제어(1), 아니면 위치제어(3)
-            # Wheel Mode: 1, Position Mode: 3 (Extended Position Mode: 4)
             target_mode = 1 if info.get('type') == 'wheel' else 3
-            
             self.packetHandler.write1ByteTxRx(
                 self.portHandler, motor_id, self.ADDR_OPERATING_MODE, target_mode
             )
-            mode_str = "Velocity" if target_mode == 1 else "Position"
-            # 디버깅용 로그 (너무 길면 주석 처리)
-            # print(f"   └─ ID {motor_id} ({name}): {mode_str} Mode")
 
     def enable_torque(self, enable):
-        """모든 모터의 토크를 켜거나 끕니다."""
         val = 1 if enable else 0
         for name, info in self.motors.items():
             self.packetHandler.write1ByteTxRx(
                 self.portHandler, info['id'], self.ADDR_TORQUE_ENABLE, val
             )
 
-    def set_smooth_motion_profile(self):
-        """관절 모터에는 부드러운 움직임을, 바퀴에는 가속도를 설정"""
-        # 관절용 설정
-        JOINT_VEL = 200  
-        JOINT_ACC = 50   
-        # 바퀴용 설정 (가속도만 설정, 속도는 명령으로 제어)
+    def set_motion_profile(self, velocity=200, accel=50):
+        """
+        ★ 모터의 움직임 성질을 실시간으로 변경하는 함수
+        - velocity (속도): 클수록 빠름 (기본 200, 초기화시 50 추천)
+        - accel (가속도): 클수록 급출발/급정지 (기본 50, 부드러움 원하면 10~20)
+        """
+        # 바퀴용 가속도
         WHEEL_ACC = 50 
         
         for name, info in self.motors.items():
             dxl_id = info['id']
             if info.get('type') == 'wheel':
-                # 바퀴는 가속도만 설정 (급출발/급정지 방지)
                 self.packetHandler.write4ByteTxRx(
                     self.portHandler, dxl_id, self.ADDR_PROFILE_ACCELERATION, WHEEL_ACC
                 )
             else:
-                # 관절은 속도와 가속도 모두 프로파일 설정
                 self.packetHandler.write4ByteTxRx(
-                    self.portHandler, dxl_id, self.ADDR_PROFILE_ACCELERATION, JOINT_ACC
+                    self.portHandler, dxl_id, self.ADDR_PROFILE_ACCELERATION, int(accel)
                 )
                 self.packetHandler.write4ByteTxRx(
-                    self.portHandler, dxl_id, self.ADDR_PROFILE_VELOCITY, JOINT_VEL
+                    self.portHandler, dxl_id, self.ADDR_PROFILE_VELOCITY, int(velocity)
                 )
+        print(f"⚡ [Settings] 모션 프로파일 변경 (Vel:{velocity}, Acc:{accel})")
 
-    def move_joint(self, joint_name, value):
+    def move_joint(self, joint_name, value, velocity=None):
         """
-        통합 이동 함수 (에러 체크 기능 추가됨)
+        통합 이동 함수 (속도 제어 추가됨)
+        - velocity: 이 동작을 수행할 속도 (0 ~ 1000). None이면 기본값 사용.
         """
         if joint_name not in self.motors:
             print(f"⚠️ 존재하지 않는 모터: {joint_name}")
@@ -105,7 +100,14 @@ class DxlDriver:
         # 안전 범위 체크
         safe_val = int(max(info['min'], min(value, info['max'])))
         
-        # 1. 명령 패킷 전송
+        # ★ [추가] 동작별 속도 설정 (이 동작만 느리게/빠르게 하고 싶을 때)
+        if velocity is not None and motor_type != 'wheel':
+            # 속도 프로파일 변경 (Goal Velocity 아님! Profile Velocity임)
+            self.packetHandler.write4ByteTxRx(
+                self.portHandler, dxl_id, self.ADDR_PROFILE_VELOCITY, int(velocity)
+            )
+        
+        # 명령 패킷 전송
         if motor_type == 'wheel':
             dxl_comm_result, dxl_error = self.packetHandler.write4ByteTxRx(
                 self.portHandler, dxl_id, self.ADDR_GOAL_VELOCITY, safe_val
@@ -115,39 +117,63 @@ class DxlDriver:
                 self.portHandler, dxl_id, self.ADDR_GOAL_POSITION, safe_val
             )
             
-        # 2. 통신 에러 체크 (케이블 문제 등)
         if dxl_comm_result != COMM_SUCCESS:
             print(f"🚨 [Comm Error] ID:{dxl_id} {self.packetHandler.getTxRxResult(dxl_comm_result)}")
-            
-        # 3. 하드웨어 에러 체크 (과부하, 과열 등)
         elif dxl_error != 0:
             error_msg = self.packetHandler.getRxPacketError(dxl_error)
-            print(f"🔥 [HW Error] ID:{dxl_id} {error_msg} (Torque OFF됨)")
-            
-            # (선택) 에러 발생 시 자동으로 토크를 다시 켜는 시도
-            # self.reboot_motor(dxl_id) # 리부트 기능은 별도 구현 필요
+            print(f"🔥 [HW Error] ID:{dxl_id} {error_msg}")
 
     def go_to_neutral(self):
-        """초기화: 관절은 초기 위치로, 바퀴는 정지(0)"""
-        print("\n⚡ [System] 로봇 자세 및 바퀴 초기화...")
+        """
+        ★ 안정화된 초기화 함수
+        1. 모션 프로파일을 '느리게' 변경
+        2. SyncWrite로 모든 관절 동시 명령 전송 (딜레이 없음)
+        """
+        print("\n⚡ [System] 로봇 자세 초기화 (Slow & Sync Mode)...")
+        
+        # 1. 천천히 움직이도록 설정 (덜컹거림 방지)
+        self.set_motion_profile(velocity=40, accel=10) 
         self.enable_torque(True)
         
-        count = 0
+        # 2. SyncWrite 패킷 생성
+        self.groupSyncWritePos.clearParam()
+        
+        target_motor_count = 0
         for name, info in self.motors.items():
-            # 바퀴의 neutral은 보통 0 (정지)
-            target = info['neutral']
-            self.move_joint(name, target)
-            if info.get('type') != 'wheel':
-                time.sleep(0.05) # 관절만 순차 딜레이 (바퀴는 즉시 멈춤)
-            count += 1
-        print(f"✅ [System] 초기화 완료 ({count}개 모터)\n")
+            if info.get('type') == 'wheel':
+                self.move_joint(name, 0) # 바퀴는 즉시 정지
+                continue
+                
+            # 관절 모터만 동시 제어 리스트에 추가
+            motor_id = info['id']
+            target_pos = info['neutral']
+            
+            # 4바이트 분해 (Low Byte -> High Byte)
+            param_goal_position = [
+                DXL_LOBYTE(DXL_LOWORD(target_pos)),
+                DXL_HIBYTE(DXL_LOWORD(target_pos)),
+                DXL_LOBYTE(DXL_HIWORD(target_pos)),
+                DXL_HIBYTE(DXL_HIWORD(target_pos))
+            ]
+            
+            if self.groupSyncWritePos.addParam(motor_id, param_goal_position):
+                target_motor_count += 1
+
+        # 3. 전송 (모든 모터 동시 출발)
+        results = self.groupSyncWritePos.txPacket()
+        if results != COMM_SUCCESS:
+            print(f"⚠️ SyncWrite 실패: {self.packetHandler.getTxRxResult(results)}")
+            
+        print(f"✅ [System] {target_motor_count}개 관절 동시 이동 명령 전송")
+        
+        # 4. 이동 시간 확보 후 정상 속도로 복귀
+        time.sleep(2.0) # 천천히 이동하니까 충분히 기다림
+        self.set_motion_profile(velocity=200, accel=50) # 다시 빠릿빠릿하게
 
     def close(self):
-        # 종료 시 안전을 위해 바퀴 먼저 정지
         for name, info in self.motors.items():
             if info.get('type') == 'wheel':
                 self.move_joint(name, 0)
-        
         time.sleep(0.5)
         self.enable_torque(False)
         self.portHandler.closePort()
