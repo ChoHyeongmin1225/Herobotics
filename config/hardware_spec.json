@@ -65,9 +65,9 @@
       "id": 7,
       "name": "waist_pitch",
       "type": "joint",
-      "neutral": 2055,
+      "neutral": 2250,
       "min": 1500,
-      "max": 2250,
+      "max": 2255,
       "desc": "허리 인사. (-)앞으로 숙임, (+)뒤로 젖힘"
     },
     {
