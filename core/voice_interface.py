@@ -27,10 +27,13 @@ class VoiceInterface:
         
         print(f"\n👂 [WakeWord] 저를 불러주세요... (인식 대상: {target_words})")
         
+        with self.mic as source:
+            self.r.adjust_for_ambient_noise(source, duration=0.5)
+        
         while True:
             try:
                 with self.mic as source:
-                    audio = self.r.listen(source, timeout=None, phrase_time_limit=3)
+                    audio = self.r.listen(source, timeout=None, phrase_time_limit=2)
                 
                 text = self.r.recognize_google(audio, language='ko-KR')
                 print(f"   👂 [DEBUG] 들린 말: '{text}'") 
