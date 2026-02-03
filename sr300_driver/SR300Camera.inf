@@ -1,0 +1,235 @@
+;/*++
+;
+;Copyright (c) Intel Corporation.  All rights reserved.
+;
+; The source code contained or described herein and all documents related to the source 
+; code ("Material") are owned by Intel Corporation or its suppliers or licensors. Title 
+; to the Material remains with Intel Corporation or its suppliers and licensors. The 
+; Material may contain trade secrets and proprietary and confidential information of 
+; Intel Corporation and its suppliers and licensors, and is protected by worldwide 
+; copyright and trade secret laws and treaty provisions. No part of the Material may be 
+; used, copied, reproduced, modified, published, uploaded, posted, transmitted, distributed, 
+; or disclosed in any way without Intel’s prior express written permission. 
+;
+; No license under any patent, copyright, trade secret or other intellectual property 
+; right is granted to or conferred upon you by disclosure or delivery of the Materials, 
+; either expressly, by implication, inducement, estoppel or otherwise. Any license under
+; such intellectual property rights must be express and approved by Intel in writing.
+;
+;Module Name:
+;
+;    SR300Camera.INF
+;
+;Abstract:
+;
+;
+;SR300 Device MFT installation file. 
+;Supports x86, x64 platforms
+;
+;--*/
+
+[Version]
+signature="$WINDOWS NT$"
+Class=Image
+ClassGUID={6bdd1fc6-810f-11d0-bec7-08002be2092f}
+PnpLockdown=1
+Provider=%ProviderName%
+DriverVer=03/16/2017,4.2.157.11
+CatalogFile=SR300Camera.cat
+
+[SourceDisksNames]
+1000=%cdname%,,,
+
+[ControlFlags]
+ExcludeFromSelect=*
+
+[SourceDisksFiles]
+SR300DeviceMft.dll=1000
+SR300_coinst.dll=1000
+;IOMODULE_DISABLED libpxccamera_SR300_64.dll=1000
+;IOMODULE_DISABLED libpxccamera_SR300_32.dll=1000
+
+[DestinationDirs]
+DefaultDestDir=11
+SR300_DMFT.CopyDMFT = 11
+SR300_COINST.CopyCoinst = 11
+;IOMODULE_DISABLED SR300_HELPER_X86 = 16428
+;IOMODULE_DISABLED SR300_HELPER_X64 = 16427
+
+[SR300_DMFT.CopyDMFT]
+SR300DeviceMft.dll
+
+[SR300_COINST.CopyCoinst]
+SR300_coinst.dll
+
+;IOMODULE_DISABLED [SR300_HELPER_X64]
+;IOMODULE_DISABLED Intel\RSDCM\libpxccamera_SR300_64.dll,libpxccamera_SR300_64.dll
+
+;IOMODULE_DISABLED [SR300_HELPER_X86]
+;IOMODULE_DISABLED Intel\RSDCM\libpxccamera_SR300_32.dll,libpxccamera_SR300_32.dll
+
+[Manufacturer]
+%ManufacturerName%=Standard,NTamd64
+
+[Standard.NTamd64]
+%SR300Color.DeviceDesc%=SR300Color.NTamd64,USB\VID_8086&PID_0AA5&MI_00
+%SR300Depth.DeviceDesc%=SR300Depth.NTamd64,USB\VID_8086&PID_0AA5&MI_02
+
+;---------------------------------------------------------------
+;                A M D 64  D D I n s t a l l
+;---------------------------------------------------------------
+
+[SR300Color.NTamd64]
+Include=usbvideo.inf, ks.inf,KSCAPTUR.inf
+Needs=USBVideo.NT, KS.Registration,KSCAPTUR.Registration.NT
+AddProperty=GenericUvcDriverColor.AddProp
+CopyFiles=SR300_DMFT.CopyDMFT
+;IOMODULE_DISABLED CopyFiles=SR300_HELPER_X64
+;IOMODULE_DISABLED CopyFiles=SR300_HELPER_X86
+
+AddReg=SR300Color.MFT.AddReg
+
+; expose non-generic device name
+PreferDeviceInfo=1
+
+[SR300Color.NTamd64.HW]
+;remove SkipCameraEnumeration if exists (DCM leftover)
+DelReg=SR300Color.NTamd64.HW.DelReg
+
+[SR300Depth.NTamd64]
+Include=usbvideo.inf, ks.inf,KSCAPTUR.inf
+Needs=USBVideo.NT, KS.Registration,KSCAPTUR.Registration.NT
+AddProperty=GenericUvcDriverDepth.AddProp
+CopyFiles=SR300_DMFT.CopyDMFT
+;IOMODULE_DISABLED CopyFiles=SR300_HELPER_X64
+;IOMODULE_DISABLED CopyFiles=SR300_HELPER_X86
+AddReg=SR300Depth.MFT.AddReg
+; expose non-generic device name
+PreferDeviceInfo=1
+
+[SR300Depth.NTamd64.CoInstallers]
+AddReg=Reg_CoInstaller64WU
+CopyFiles=SR300_COINST.CopyCoinst
+
+[Reg_CoInstaller64WU]
+HKR,,CoInstallers32,0x00010000,"SR300_coinst.dll,SR300CoInstallerEntryPointWU"
+
+[SR300Depth.NTamd64.HW]
+AddReg=SR300Depth.NTamd64.HW.AddReg
+
+[SR300Depth.NTamd64.HW.AddReg]
+HKR,,SensorCameraMode,0x0010001,1
+HKR,,SkipCameraEnumeration,0x00010001,1
+
+;---------------------------------------------------------------
+;                I n t e r f a c e s
+;---------------------------------------------------------------
+
+[SR300Color.NTamd64.Interfaces]
+AddInterface=%KSCATEGORY_CAPTURE%,"GLOBAL",CaptureInterfaceColor.NT,0
+AddInterface=%KSCATEGORY_VIDEO%,GLOBAL,CaptureInterfaceColor.NT,0
+AddInterface=%KSCATEGORY_VIDEO_CAMERA%,GLOBAL,CaptureInterfaceColor.NT,0
+
+[SR300Depth.NTamd64.Interfaces]
+AddInterface=%KSCATEGORY_CAPTURE%,"GLOBAL",CaptureInterfaceDEPTH.NT,0
+AddInterface=%KSCATEGORY_VIDEO%,GLOBAL,CaptureInterfaceDEPTH.NT,0
+AddInterface=%KSCATEGORY_SENSOR_CAMERA%,GLOBAL,CaptureInterfaceDEPTH.NT,0
+
+[GenericUvcDriverColor.AddProp]
+GenericDriverInstalled,,,,1
+
+[GenericUvcDriverDepth.AddProp]
+GenericDriverInstalled,,,,1
+
+[CaptureInterfaceColor.NT]
+AddReg=SR300Color.Reader.AddReg
+
+[CaptureInterfaceDEPTH.NT]
+AddReg=SR300Depth.Reader.AddReg
+
+;---------------------------------------------------------------
+;                A d d R e g
+;---------------------------------------------------------------
+
+[SR300Color.Reader.AddReg]
+HKR,,CLSID,,%Proxy.CLSID%
+HKR,,FriendlyName,,%SR300Color.Reader.FriendlyName%
+HKR,,CameraDeviceMftClsid,,%COLOR_DMFT.CLSID%
+HKR,,FSSensorGroupID,,"{24CE1A60-E27C-4009-85ED-51798FF6D3B7}"
+HKR,,FSSensorGroupName,,"Intel SR300 Cameras"
+HKR,,MetadataBufferSizeInKB0,0x00010001,0x00000005
+
+[SR300Depth.Reader.AddReg]
+HKR,,CLSID,,%Proxy.CLSID%
+HKR,,FriendlyName,,%SR300Depth.Reader.FriendlyName%
+HKR,,CameraDeviceMftClsid,,%DEPTH_DMFT.CLSID%
+HKR,,FSSensorGroupID,,"{24CE1A60-E27C-4009-85ED-51798FF6D3B7}"
+HKR,,FSSensorGroupName,,"Intel SR300 Cameras"
+HKR,,MetadataBufferSizeInKB0,0x00010001,0x00000005
+
+[SR300Color.MFT.AddReg]
+HKCR,CLSID\%COLOR_DMFT.CLSID%,,,"SR300 COLOR Device MFT Class"
+HKCR,CLSID\%COLOR_DMFT.CLSID%\InprocServer32,,%REG_EXPAND_SZ%,"%%SystemRoot%%\system32\SR300DeviceMft.dll"
+HKCR,CLSID\%COLOR_DMFT.CLSID%\InprocServer32,ThreadingModel,,"Both"
+
+[SR300Color.NTamd64.HW.DelReg]
+HKR,,SkipCameraEnumeration
+
+[SR300Depth.MFT.AddReg]
+HKCR,CLSID\%DEPTH_DMFT.CLSID%,,,"SR300 Depth Device MFT Class"
+HKCR,CLSID\%DEPTH_DMFT.CLSID%\InprocServer32,,%REG_EXPAND_SZ%,"%%SystemRoot%%\system32\SR300DeviceMft.dll"
+HKCR,CLSID\%DEPTH_DMFT.CLSID%\InprocServer32,ThreadingModel,,"Both"
+
+
+;---------------------------------------------------------------
+;                S e r v i c e s  
+;---------------------------------------------------------------
+
+[SR300Color.NTamd64.Services]
+AddService = usbvideo,0x00000002,SR300Color.ServiceInstall
+
+[SR300Depth.NTamd64.Services]
+AddService = usbvideo,0x00000002,SR300Depth.ServiceInstall
+
+[SR300Color.ServiceInstall]
+DisplayName=%SR300Color.DeviceDesc%
+ServiceType=%SERVICE_KERNEL_DRIVER%
+StartType=%SERVICE_DEMAND_START%
+ErrorControl=%SERVICE_ERROR_NORMAL%
+ServiceBinary = %10%\System32\Drivers\usbvideo.sys
+
+[SR300Depth.ServiceInstall]
+DisplayName=%SR300Depth.DeviceDesc%
+ServiceType=%SERVICE_KERNEL_DRIVER%
+StartType=%SERVICE_DEMAND_START%
+ErrorControl=%SERVICE_ERROR_NORMAL%
+ServiceBinary = %10%\System32\Drivers\usbvideo.sys
+
+;---------------------------------------------------------------
+;                S t r i n g s
+;---------------------------------------------------------------
+
+[Strings]
+; non-localizable
+Proxy.CLSID="{17CCA71B-ECD7-11D0-B908-00A0C9223196}"
+KSCATEGORY_CAPTURE="{65E8773D-8F56-11D0-A3B9-00A0C9223196}"
+KSCATEGORY_VIDEO="{6994AD05-93EF-11D0-A3CC-00A0C9223196}"
+KSCATEGORY_VIDEO_CAMERA="{E5323777-F976-4f5b-9B55-B94699C46E44}"
+KSCATEGORY_SENSOR_CAMERA="{24E552D7-6523-47F7-A647-D3465BF1F5CA}"
+COLOR_DMFT.CLSID="{01BC2102-6449-429F-8F62-B8D23D1DE6D3}"
+DEPTH_DMFT.CLSID="{7F9DF308-0F2D-432E-8C8E-D36ED8F12C90}"
+
+SERVICE_KERNEL_DRIVER=1
+SERVICE_DEMAND_START=3
+SERVICE_ERROR_NORMAL=1
+REG_DWORD=0x00010001
+REG_EXPAND_SZ=0x00020000
+
+;localizable
+ProviderName="Intel"
+ManufacturerName="Intel"
+SR300Color.DeviceDesc="Intel(R) RealSense(TM) Camera SR300 Color"
+SR300Color.Reader.FriendlyName="Intel(R) RealSense(TM) Camera SR300 Color"
+SR300Depth.DeviceDesc="Intel(R) RealSense(TM) Camera SR300 Depth"
+SR300Depth.Reader.FriendlyName="Intel(R) RealSense(TM) Camera SR300 Depth"
+cdname="SR300 Installation Disk"
