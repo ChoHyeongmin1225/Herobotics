@@ -11,18 +11,18 @@
       "id": 1,
       "name": "head_tilt_up",
       "type": "joint",
-      "neutral": 1026,
-      "min": 600,
-      "max": 1026,
+      "neutral": 20,
+      "min": 11,
+      "max": 700,
       "desc": "목을 위로 든다. 값이 줄어들수록 위로 들리고, 초기값보다 커지면 안 됨."
     },
     {
       "id": 2,
       "name": "head_pan",
       "type": "joint",
-      "neutral": 2032,
-      "min": 1500,
-      "max": 2500,
+      "neutral": 2047,
+      "min": 1000,
+      "max": 3000,
       "desc": "고개를 좌우로 돌린다. (+)왼쪽, (-)오른쪽"
     },
     {
@@ -65,9 +65,9 @@
       "id": 7,
       "name": "waist_pitch",
       "type": "joint",
-      "neutral": 2250,
-      "min": 1500,
-      "max": 2255,
+      "neutral": 531,
+      "min": 130,
+      "max": 1000,
       "desc": "허리 인사. (-)앞으로 숙임, (+)뒤로 젖힘"
     },
     {

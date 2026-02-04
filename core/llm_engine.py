@@ -13,10 +13,15 @@ class LLMEngine:
         genai.configure(api_key=API_KEY)
         
         # 1. 하드웨어 스펙 로드
-        with open(spec_path, 'r', encoding='utf-8') as f:
-            self.spec_text = f.read()
+        try:
+            with open(spec_path, 'r', encoding='utf-8') as f:
+                self.spec_text = f.read()
+        except FileNotFoundError:
+            self.spec_text = "하드웨어 정보를 찾을 수 없음."
             
-        # 2. 시스템 프롬프트 구성 (★ Delay 규칙 추가됨)
+        # =================================================================
+        # [Mode 1: 일반 대화 및 섬세한 행동 제어] (캡틴의 오리지널 프롬프트)
+        # =================================================================
         self.system_instruction = f"""
         너는 Physical AI 로봇 'Herobot'의 두뇌다.
         너는 상체(관절)와 하체(바퀴)를 모두 제어할 수 있다.
@@ -65,16 +70,73 @@ class LLMEngine:
         }}
         """
         
-        # 3. 모델 초기화 (JSON 모드)
+        # =================================================================
+        # [Mode 2: 자율 탐색 에이전트] (새로 추가된 기능)
+        # =================================================================
+        self.search_instruction = """
+        너는 '탐색 전문 로봇'의 두뇌다. 
+        너의 목표는 사용자가 요청한 물건을 시각 정보(Vision)를 바탕으로 찾는 것이다.
+        너는 상황을 판단하여 다음 [행동 명령어] 중 하나를 선택해야 한다.
+
+        [사용 가능한 행동 명령어]
+        1. "LOOK_DOWN": 바닥을 확인한다. (마우스, 신발, 떨어진 물건 등)
+        2. "LOOK_FRONT": 정면이나 책상 위를 확인한다. (모니터, 컵, 사람 얼굴 등)
+        3. "TURN_LEFT": 고개를 왼쪽으로 돌린다.
+        4. "TURN_RIGHT": 고개를 오른쪽으로 돌린다.
+        5. "STOP": 물건을 찾았거나, 도저히 없어서 포기할 때.
+
+        [응답 형식 (JSON)]
+        {
+            "thought": "왜 이 행동을 선택했는지 짧은 추론",
+            "command": "위 명령어 중 하나",
+            "speak": "사용자에게 진행 상황 보고 (짧게)"
+        }
+        """
+        
+        # 모델 초기화 (JSON 모드)
         self.model = genai.GenerativeModel(
             model_name="gemini-2.5-flash",
-            generation_config={"response_mime_type": "application/json"},
-            system_instruction=self.system_instruction
+            generation_config={"response_mime_type": "application/json"}
         )
-        self.chat = self.model.start_chat(history=[])
+        
+        # 일반 대화용 채팅 세션 시작 (기존 프롬프트 적용)
+        self.chat = self.model.start_chat(history=[
+            {"role": "user", "parts": [self.system_instruction]},
+            {"role": "model", "parts": ["{\"text\": \"네, 알겠습니다. 히어로봇 준비 완료!\"}"]}
+        ])
+
+    def decide_next_move(self, target, vision_result, history_text):
+        """
+        ★ [자율 탐색 모드] 상황을 듣고 다음 행동을 결정하는 함수
+        """
+        # 탐색 전용 프롬프트 구성
+        prompt = f"""
+        [탐색 미션: '{target}' 찾기]
+        
+        1. 현재 상황 (Vision Result): "{vision_result}"
+        2. 지금까지 한 행동들 (History): {history_text}
+        
+        위 정보를 바탕으로, 물건을 찾기 위한 최적의 '다음 행동'을 결정해서 JSON으로 답해줘.
+        """
+        
+        try:
+            print("🧠 [Brain/Agent] 다음 행동 판단 중...", end=" ")
+            # 시스템 프롬프트를 search_instruction으로 교체하여 추론
+            response = self.model.generate_content(
+                contents=[self.search_instruction, prompt]
+            )
+            print("✅ 결정 완료")
+            return json.loads(response.text)
+            
+        except Exception as e:
+            print(f"❌ [Brain] 판단 오류: {e}")
+            return {"command": "STOP", "speak": "오류가 나서 멈출게요.", "thought": "에러 발생"}
 
     def generate_response(self, user_input):
-        print("🧠 [Brain] 생각 중...", end="", flush=True)
+        """
+        [일반 대화 모드] 기존 로직 유지 (섬세한 제어 가능)
+        """
+        print("🧠 [Brain/Chat] 생각 중...", end="", flush=True)
         
         max_retries = 3
         retry_delay = 30
@@ -89,11 +151,8 @@ class LLMEngine:
                 error_msg = str(e)
                 if "429" in error_msg or "Quota exceeded" in error_msg:
                     print(f"\n⏳ [System] API 호출 한도 초과! ({attempt+1}/{max_retries})")
-                    print(f"   - 구글 무료 정책 때문에 {retry_delay}초간 대기...")
-                    for i in range(retry_delay, 0, -1):
-                        print(f"   ... {i}초 남음", end='\r')
-                        time.sleep(1)
-                    print("   ▶️ 다시 시도합니다!                    ")
+                    print(f"   - {retry_delay}초간 대기...")
+                    time.sleep(retry_delay)
                 else:
                     print(f"\n❌ [Brain] 생각 오류: {e}")
                     return None
