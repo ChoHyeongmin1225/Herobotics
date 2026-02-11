@@ -11,7 +11,9 @@ __pycache__/
 venv/
 env/
 .venv/
+hero/
+.hero/
 
 # 4. OS 시스템 파일
 .DS_Store
-Thumbs.db
+Thumbs.dbhero/
