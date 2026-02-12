@@ -71,7 +71,7 @@ class LLMEngine:
         """
         
         # =================================================================
-        # [Mode 2: 자율 탐색 에이전트] (새로 추가된 기능)
+        # [Mode 2: 자율 탐색 에이전트] (자율 탐색용 프롬프트)
         # =================================================================
         self.search_instruction = """
         너는 '탐색 전문 로봇'의 두뇌다. 
@@ -94,8 +94,9 @@ class LLMEngine:
         """
         
         # 모델 초기화 (JSON 모드)
+        # ★ 캡틴의 명령대로 2.5-flash 모델명 고정
         self.model = genai.GenerativeModel(
-            model_name="gemini-2.5-flash",
+            model_name="gemini-2.5-flash", 
             generation_config={"response_mime_type": "application/json"}
         )
         
@@ -159,3 +160,36 @@ class LLMEngine:
         
         print("❌ [System] 실패")
         return None
+
+    # =================================================================
+    # ★ [필수] 사용자의 의도(찾을 물건 + 방향 힌트)를 파악하는 함수
+    # =================================================================
+    def extract_search_intent(self, user_text):
+        """
+        사용자 말에서 '찾을 물건(target)'과 '방향 힌트(hint)'를 JSON으로 추출합니다.
+        어떤 물건이든(지갑, 차키, 리모컨 등) 영어로 변환하여 타겟으로 설정합니다.
+        """
+        prompt = f"""
+        Analyze the following Korean text: "{user_text}"
+        
+        Your task is to identify if the user is asking to find any object.
+        
+        1. "target": Translate the object name into English. (e.g., "물통"->"water bottle", "내 지갑"->"wallet", "파란색 공"->"blue ball").
+        2. "hint": Extract directional hints if present. One of ["LOOK_DOWN", "TURN_LEFT", "TURN_RIGHT", "LOOK_FRONT"] based on words like '아래/밑', '왼쪽', '오른쪽'. If no direction is specified, return null.
+        
+        Return ONLY a JSON object.
+        Example: {{"target": "water bottle", "hint": "LOOK_DOWN"}}
+        If it's NOT a search command, return {{"target": null, "hint": null}}.
+        """
+        
+        try:
+            # 모델 호출 (기존 모델 재사용)
+            response = self.model.generate_content(prompt)
+            
+            # JSON 파싱 (혹시 모를 마크다운 기호 제거)
+            clean_text = response.text.replace("```json", "").replace("```", "").strip()
+            return json.loads(clean_text)
+            
+        except Exception as e:
+            print(f"⚠️ [Intent Error] {e}")
+            return {"target": None, "hint": None}

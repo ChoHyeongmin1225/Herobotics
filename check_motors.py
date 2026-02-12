@@ -4,7 +4,7 @@ from dynamixel_sdk import * # Uses Dynamixel SDK library
 # ==============================================================================
 # ⚙️ 설정 (Herobot Hardware Setup)
 # ==============================================================================
-DEVICENAME          = 'COM6'    # 포트 이름
+DEVICENAME          = '/dev/ttyUSB0'    # 포트 이름
 BAUDRATE            = 57600     # 통신 속도
 PROTOCOL_VERSION    = 2.0       # 프로토콜 버전
 

@@ -3,6 +3,7 @@ import sys
 import os
 import json
 from dotenv import load_dotenv
+from contextlib import contextmanager  # ★ 음소거 마법을 위한 라이브러리 추가
 
 # 모듈 임포트
 from hardware.dxl_driver import DxlDriver
@@ -15,6 +16,22 @@ load_dotenv()
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
 # =========================================================
+# [마법의 함수] C 레벨(ALSA, JACK 등)의 쓸데없는 경고창 강제 음소거
+# =========================================================
+@contextmanager
+def suppress_alsa_warnings():
+    fd = sys.stderr.fileno()
+    old_stderr = os.dup(fd)
+    devnull = os.open(os.devnull, os.O_WRONLY)
+    os.dup2(devnull, fd)
+    try:
+        yield
+    finally:
+        os.dup2(old_stderr, fd)
+        os.close(old_stderr)
+        os.close(devnull)
+
+# =========================================================
 # [Agent Action Map] 자율 탐색 시 사용할 행동 정의
 # =========================================================
 ACTION_MAP = {
@@ -25,7 +42,6 @@ ACTION_MAP = {
     "NEUTRAL":    {"head_pan": 2047, "head_tilt_down": 1027, "waist_pitch": 531, "waist_yaw": 3122}
 }
 
-# ★ [수정] hint_action=None 추가하여 에러 해결!
 def run_agent_search(driver, brain, vision, target_name, hint_action=None):
     """
     [자율 탐색 모드]
@@ -127,7 +143,7 @@ def run_agent_search(driver, brain, vision, target_name, hint_action=None):
 
 def main():
     print("=============================================")
-    print("🤖 Herobot Ultimate Mode (Fix: Hint Error)")
+    print("🤖 Herobot Ultimate Mode (Clean Audio Logs)")
     print("=============================================")
     
     try:
@@ -142,7 +158,9 @@ def main():
 
         # 2. 음성 모듈 초기화
         print("3. 청각(Voice) 연결 중...", end=" ")
-        voice = VoiceInterface()
+        # ★ 마이크 초기화 시 발생하는 경고음소거
+        with suppress_alsa_warnings():
+            voice = VoiceInterface()
         print("✅ 성공")
         
         # 3. 시각 모듈 초기화
@@ -164,10 +182,16 @@ def main():
     while True:
         try:
             # (1) 호출어 대기 ("히어로봇")
-            if voice.wait_for_wake_word("히어로봇"):
+            # ★ 마이크 대기 시 발생하는 경고음소거
+            with suppress_alsa_warnings():
+                is_awake = voice.wait_for_wake_word("히어로봇")
+                
+            if is_awake:
                 
                 # (2) 명령 듣기
-                user_input = voice.listen_command()
+                # ★ 명령을 들을 때 발생하는 경고음소거
+                with suppress_alsa_warnings():
+                    user_input = voice.listen_command()
                 
                 if not user_input:
                     print("⚡ [Idle] 명령을 듣지 못했습니다. 다시 불러주세요.")
