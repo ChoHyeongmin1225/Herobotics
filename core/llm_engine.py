@@ -1,7 +1,8 @@
 import os
 import json
 import time
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 from dotenv import load_dotenv
 
 # .env 파일에서 API 키 로드
@@ -10,8 +11,6 @@ API_KEY = os.getenv("GEMINI_API_KEY")
 
 class LLMEngine:
     def __init__(self, spec_path="config/hardware_spec.json"):
-        genai.configure(api_key=API_KEY)
-        
         # 1. 하드웨어 스펙 로드
         try:
             with open(spec_path, 'r', encoding='utf-8') as f:
@@ -70,68 +69,18 @@ class LLMEngine:
         }}
         """
         
-        # =================================================================
-        # [Mode 2: 자율 탐색 에이전트] (자율 탐색용 프롬프트)
-        # =================================================================
-        self.search_instruction = """
-        너는 '탐색 전문 로봇'의 두뇌다. 
-        너의 목표는 사용자가 요청한 물건을 시각 정보(Vision)를 바탕으로 찾는 것이다.
-        너는 상황을 판단하여 다음 [행동 명령어] 중 하나를 선택해야 한다.
-
-        [사용 가능한 행동 명령어]
-        1. "LOOK_DOWN": 바닥을 확인한다. (마우스, 신발, 떨어진 물건 등)
-        2. "LOOK_FRONT": 정면이나 책상 위를 확인한다. (모니터, 컵, 사람 얼굴 등)
-        3. "TURN_LEFT": 고개를 왼쪽으로 돌린다.
-        4. "TURN_RIGHT": 고개를 오른쪽으로 돌린다.
-        5. "STOP": 물건을 찾았거나, 도저히 없어서 포기할 때.
-
-        [응답 형식 (JSON)]
-        {
-            "thought": "왜 이 행동을 선택했는지 짧은 추론",
-            "command": "위 명령어 중 하나",
-            "speak": "사용자에게 진행 상황 보고 (짧게)"
-        }
-        """
+        # 2. 새로운 SDK 클라이언트 초기화
+        self.client = genai.Client(api_key=API_KEY)
         
-        # 모델 초기화 (JSON 모드)
-        # ★ 캡틴의 명령대로 2.5-flash 모델명 고정
-        self.model = genai.GenerativeModel(
-            model_name="gemini-2.5-flash", 
-            generation_config={"response_mime_type": "application/json"}
-        )
-        
-        # 일반 대화용 채팅 세션 시작 (기존 프롬프트 적용)
-        self.chat = self.model.start_chat(history=[
-            {"role": "user", "parts": [self.system_instruction]},
-            {"role": "model", "parts": ["{\"text\": \"네, 알겠습니다. 히어로봇 준비 완료!\"}"]}
-        ])
-
-    def decide_next_move(self, target, vision_result, history_text):
-        """
-        ★ [자율 탐색 모드] 상황을 듣고 다음 행동을 결정하는 함수
-        """
-        # 탐색 전용 프롬프트 구성
-        prompt = f"""
-        [탐색 미션: '{target}' 찾기]
-        
-        1. 현재 상황 (Vision Result): "{vision_result}"
-        2. 지금까지 한 행동들 (History): {history_text}
-        
-        위 정보를 바탕으로, 물건을 찾기 위한 최적의 '다음 행동'을 결정해서 JSON으로 답해줘.
-        """
-        
-        try:
-            print("🧠 [Brain/Agent] 다음 행동 판단 중...", end=" ")
-            # 시스템 프롬프트를 search_instruction으로 교체하여 추론
-            response = self.model.generate_content(
-                contents=[self.search_instruction, prompt]
+        # 3. 채팅 세션 시작 (새로운 SDK 문법 적용: system_instruction을 config에 직접 탑재)
+        # ★ 캡틴의 명령대로 모델명 고정 (만약 2.5-flash에서 에러가 나면 "gemini-2.0-flash"로 변경하세요)
+        self.chat = self.client.chats.create(
+            model="gemini-3-flash-preview",
+            config=types.GenerateContentConfig(
+                system_instruction=self.system_instruction,
+                response_mime_type="application/json"
             )
-            print("✅ 결정 완료")
-            return json.loads(response.text)
-            
-        except Exception as e:
-            print(f"❌ [Brain] 판단 오류: {e}")
-            return {"command": "STOP", "speak": "오류가 나서 멈출게요.", "thought": "에러 발생"}
+        )
 
     def generate_response(self, user_input):
         """
@@ -160,36 +109,3 @@ class LLMEngine:
         
         print("❌ [System] 실패")
         return None
-
-    # =================================================================
-    # ★ [필수] 사용자의 의도(찾을 물건 + 방향 힌트)를 파악하는 함수
-    # =================================================================
-    def extract_search_intent(self, user_text):
-        """
-        사용자 말에서 '찾을 물건(target)'과 '방향 힌트(hint)'를 JSON으로 추출합니다.
-        어떤 물건이든(지갑, 차키, 리모컨 등) 영어로 변환하여 타겟으로 설정합니다.
-        """
-        prompt = f"""
-        Analyze the following Korean text: "{user_text}"
-        
-        Your task is to identify if the user is asking to find any object.
-        
-        1. "target": Translate the object name into English. (e.g., "물통"->"water bottle", "내 지갑"->"wallet", "파란색 공"->"blue ball").
-        2. "hint": Extract directional hints if present. One of ["LOOK_DOWN", "TURN_LEFT", "TURN_RIGHT", "LOOK_FRONT"] based on words like '아래/밑', '왼쪽', '오른쪽'. If no direction is specified, return null.
-        
-        Return ONLY a JSON object.
-        Example: {{"target": "water bottle", "hint": "LOOK_DOWN"}}
-        If it's NOT a search command, return {{"target": null, "hint": null}}.
-        """
-        
-        try:
-            # 모델 호출 (기존 모델 재사용)
-            response = self.model.generate_content(prompt)
-            
-            # JSON 파싱 (혹시 모를 마크다운 기호 제거)
-            clean_text = response.text.replace("```json", "").replace("```", "").strip()
-            return json.loads(clean_text)
-            
-        except Exception as e:
-            print(f"⚠️ [Intent Error] {e}")
-            return {"target": None, "hint": None}

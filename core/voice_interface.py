@@ -4,7 +4,7 @@ import time
 class VoiceInterface:
     def __init__(self):
         self.r = sr.Recognizer()
-        self.mic = sr.Microphone()
+        self.mic = sr.Microphone(device_index=0)
         
         # 인식 감도 설정 (Dynamic Energy Threshold)
         self.r.dynamic_energy_threshold = True
