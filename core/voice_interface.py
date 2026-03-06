@@ -48,6 +48,10 @@ class VoiceInterface:
                     print(f"👋 [WakeWord] 종료 명령 감지! ({text})")
                     return False
                     
+                else:
+                    print("   💤 호출어가 포함되어 있지 않습니다. 다시 저를 불러주세요...")
+                    # while True 루프이므로 자동으로 다시 마이크 듣기로 돌아갑니다.
+                    
             except sr.WaitTimeoutError:
                 continue
             except sr.UnknownValueError:

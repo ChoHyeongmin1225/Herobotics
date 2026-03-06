@@ -125,30 +125,27 @@ class DxlDriver:
 
     def go_to_neutral(self):
         """
-        ★ 안정화된 초기화 함수
-        1. 모션 프로파일을 '느리게' 변경
-        2. SyncWrite로 모든 관절 동시 명령 전송 (딜레이 없음)
+        ★ 안정화된 초기화 함수 (16, 17번 과부하 방지 시차 적용)
         """
         print("\n⚡ [System] 로봇 자세 초기화 (Slow & Sync Mode)...")
-        
-        # 1. 천천히 움직이도록 설정 (덜컹거림 방지)
         self.set_motion_profile(velocity=40, accel=10) 
         self.enable_torque(True)
         
-        # 2. SyncWrite 패킷 생성
         self.groupSyncWritePos.clearParam()
-        
         target_motor_count = 0
+        
+        # 1. 16번, 17번을 제외한 나머지 관절만 먼저 동시 이동 준비
         for name, info in self.motors.items():
             if info.get('type') == 'wheel':
-                self.move_joint(name, 0) # 바퀴는 즉시 정지
+                self.move_joint(name, 0)
                 continue
                 
-            # 관절 모터만 동시 제어 리스트에 추가
             motor_id = info['id']
+            # ★ 16번과 17번은 이 첫 번째 동시 출발에서 제외!
+            if motor_id in [16, 17]:
+                continue
+                
             target_pos = info['neutral']
-            
-            # 4바이트 분해 (Low Byte -> High Byte)
             param_goal_position = [
                 DXL_LOBYTE(DXL_LOWORD(target_pos)),
                 DXL_HIBYTE(DXL_LOWORD(target_pos)),
@@ -159,16 +156,21 @@ class DxlDriver:
             if self.groupSyncWritePos.addParam(motor_id, param_goal_position):
                 target_motor_count += 1
 
-        # 3. 전송 (모든 모터 동시 출발)
-        results = self.groupSyncWritePos.txPacket()
-        if results != COMM_SUCCESS:
-            print(f"⚠️ SyncWrite 실패: {self.packetHandler.getTxRxResult(results)}")
-            
-        print(f"✅ [System] {target_motor_count}개 관절 동시 이동 명령 전송")
+        # 몸통 및 팔 윗부분 먼저 동시 출발
+        self.groupSyncWritePos.txPacket()
+        print(f"✅ [System] {target_motor_count}개 관절 선행 이동")
         
-        # 4. 이동 시간 확보 후 정상 속도로 복귀
-        time.sleep(2.0) # 천천히 이동하니까 충분히 기다림
-        self.set_motion_profile(velocity=200, accel=50) # 다시 빠릿빠릿하게
+        # 2. ★ 다른 관절이 자리를 잡을 때까지 1.5초 대기 (전력 및 관성 안정화)
+        time.sleep(1.5)
+        
+        # 3. 마지막으로 손목(16번)과 손(17번) 부드럽게 개별 이동
+        print("✅ [System] 손목(16) 및 손(17) 순차 이동")
+        self.move_joint('l_wrist_pitch', self.motors['l_wrist_pitch']['neutral'], velocity=30)
+        time.sleep(0.5)
+        self.move_joint('l_hand', self.motors['l_hand']['neutral'], velocity=30)
+        time.sleep(1.0)
+        
+        self.set_motion_profile(velocity=200, accel=50) # 다시 정상 속도 복귀
 
     def close(self):
         for name, info in self.motors.items():

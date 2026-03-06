@@ -1,6 +1,7 @@
 import os
 import json
 import time
+import concurrent.futures
 from google import genai
 from google.genai import types
 from dotenv import load_dotenv
@@ -72,19 +73,20 @@ class LLMEngine:
         # 2. 새로운 SDK 클라이언트 초기화
         self.client = genai.Client(api_key=API_KEY)
         
-        # 3. 채팅 세션 시작 (새로운 SDK 문법 적용: system_instruction을 config에 직접 탑재)
-        # ★ 캡틴의 명령대로 모델명 고정 (만약 2.5-flash에서 에러가 나면 "gemini-2.0-flash"로 변경하세요)
+        # 3. 채팅 세션 시작 (빠르고 똑똑한 Lite 모델로 교체)
         self.chat = self.client.chats.create(
-            model="gemini-3-flash-preview",
+            model="gemini-3.1-flash-lite-preview",  # ⚡ 1. 속도 문제를 해결하기 위해 Lite 모델 적용
             config=types.GenerateContentConfig(
                 system_instruction=self.system_instruction,
-                response_mime_type="application/json"
+                response_mime_type="application/json",
+                temperature=0.4  # 🎯 2. 모델이 말을 못 알아듣고 헛소리하는 것을 막기 위해 창의성 억제 (기본값 1.0 -> 0.4)
             )
         )
 
-    def generate_response(self, user_input):
+    def generate_response(self, user_input, timeout=10):
         """
-        [일반 대화 모드] 기존 로직 유지 (섬세한 제어 가능)
+        [일반 대화 모드] 타임아웃 기능이 추가된 행동 제어
+        - timeout: LLM 응답을 기다리는 최대 시간(초). 기본값 10초.
         """
         print("🧠 [Brain/Chat] 생각 중...", end="", flush=True)
         
@@ -93,10 +95,22 @@ class LLMEngine:
 
         for attempt in range(max_retries):
             try:
-                response = self.chat.send_message(user_input)
+                # ★ ThreadPoolExecutor를 사용해 백그라운드에서 API 호출
+                with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+                    # self.chat.send_message를 별도 스레드에서 실행
+                    future = executor.submit(self.chat.send_message, user_input)
+                    
+                    # timeout 초만큼 기다림. 안 끝나면 TimeoutError 발생!
+                    response = future.result(timeout=timeout)
+                    
                 print(" ✅ 완료")
                 return json.loads(response.text)
 
+            except concurrent.futures.TimeoutError:
+                # ★ 10초가 넘어가면 쿨하게 포기하고 빠져나옴
+                print("\n⏳ [Brain] 생각이 너무 오래 걸려 취소했습니다. (타임아웃)")
+                return None
+                
             except Exception as e:
                 error_msg = str(e)
                 if "429" in error_msg or "Quota exceeded" in error_msg:
